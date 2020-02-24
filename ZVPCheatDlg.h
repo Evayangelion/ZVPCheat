@@ -36,7 +36,12 @@ public:
 private:
 	friend DWORD listenerTreadFunc(LPVOID);
 	HANDLE m_listenerThread;
+	//一击必杀按钮
 	CButton m_bnKill;
+	// 无限阳光按钮
+	CButton m_bnSun;
 public:
 	afx_msg void OnBnClickedKill();
+	afx_msg void OnBnClickedSun();
+	
 };

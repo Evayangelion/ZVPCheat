@@ -17,8 +17,41 @@ CString str;\
 str.Format(CString(fmt),__VA_ARGS__);\
 AfxMessageBox(str);
 
-CZVPCheatDlg* g_dlg;
-HANDLE g_processHandle;
+static CZVPCheatDlg* g_dlg;
+static HANDLE g_processHandle;
+
+//将某个地址值写入内存 ...表示地址链 ，以-1结尾
+void WriteMemory(void* value, DWORD valueSize, ...) {
+	if (value == NULL || g_processHandle == NULL)
+		return;
+	DWORD tempValue = 0;
+
+	va_list addresses;
+	va_start(addresses, valueSize);
+	DWORD offset = 0;
+	DWORD lastAddress = 0;
+	while ((offset = va_arg(addresses, DWORD)) != -1) {
+		lastAddress = tempValue + offset;
+		::ReadProcessMemory(g_processHandle, (LPCVOID)lastAddress, &tempValue, sizeof(DWORD),0);
+	}
+	va_end(addresses);
+
+	//写入内存方法原型
+		/*WriteProcessMemory(
+			_In_ HANDLE hProcess,
+			_In_ LPVOID lpBaseAddress,
+			_In_reads_bytes_(nSize) LPCVOID lpBuffer,
+			_In_ SIZE_T nSize,
+			_Out_opt_ SIZE_T * lpNumberOfBytesWritten
+		);*/
+	::WriteProcessMemory(g_processHandle, (LPVOID)lastAddress, value, valueSize, NULL);
+}
+
+//重载 往address写入大小为valueSize的数据value
+void WriteMemory(void* value, DWORD valueSize, DWORD address) {
+	WriteMemory(value, valueSize, address, -1);
+}
+
 DWORD listenerTreadFunc(LPVOID lpThreadParameter) {
 
 	while (1) {
@@ -34,9 +67,11 @@ DWORD listenerTreadFunc(LPVOID lpThreadParameter) {
 			g_dlg->m_bnKill.EnableWindow(FALSE);
 			//重置checkbox状态
 			g_dlg->m_bnKill.SetCheck(FALSE);
-
+			
+			//若窗口句柄中途歇逼 则下一次需要重新获得进程句柄
+			g_processHandle = NULL;
 		}
-		else {
+		else if(g_processHandle==NULL){//已获取窗口句柄，且进程句柄还没有获取
 			//按钮状态可用
 			g_dlg->m_bnKill.EnableWindow(TRUE);
 
@@ -47,6 +82,7 @@ DWORD listenerTreadFunc(LPVOID lpThreadParameter) {
 			g_processHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
 			//至此，进程句柄有了 在实现那里可以使用了
 		}
+		
 		Sleep(1000);
 
 	}
@@ -100,6 +136,7 @@ void CZVPCheatDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_KILL, m_bnKill);
+	DDX_Control(pDX, IDC_SUN, m_bnSun);
 }
 
 BEGIN_MESSAGE_MAP(CZVPCheatDlg, CDialogEx)
@@ -108,6 +145,7 @@ BEGIN_MESSAGE_MAP(CZVPCheatDlg, CDialogEx)
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_FINDME, &CZVPCheatDlg::OnBnClickedFindme)
 	ON_BN_CLICKED(IDC_KILL, &CZVPCheatDlg::OnBnClickedKill)
+	ON_BN_CLICKED(IDC_SUN, &CZVPCheatDlg::OnBnClickedSun)
 END_MESSAGE_MAP()
 
 
@@ -201,7 +239,7 @@ HCURSOR CZVPCheatDlg::OnQueryDragIcon()
 
 void CZVPCheatDlg::OnBnClickedFindme()
 {
-	ShellExecute(NULL, CString("open"), CString("http://49.234.99.58/findme"), NULL, NULL, SW_SHOWNORMAL);
+	ShellExecute(NULL, CString("open"), CString("http://dovee.cn/findme"), NULL, NULL, SW_SHOWNORMAL);
 
 	// TODO: 在此添加控件通知处理程序代码
 }
@@ -211,10 +249,27 @@ void CZVPCheatDlg::OnBnClickedKill()
 {
 	// TODO: 在此添加控件通知处理程序代码
 	if (m_bnKill.GetCheck()) {//功能开启
-		WriteProcessMemory(g_processHandle);
+		BYTE data[] = { 0xff,0x90,0x90 };
+		WriteMemory(data, sizeof(data), 0x00531310);
+
 		log("yeah");
 	}
 	else {
+		BYTE data[] = { 0x7c,0x24,0x20 };
+		WriteMemory(data, sizeof(data), 0x00531310);
 		log("no");
 	}
+}
+
+
+void CZVPCheatDlg::OnBnClickedSun()
+{
+	while (1) {
+		if (g_dlg->m_bnSun.GetCheck()) {
+			DWORD value = 9999;
+			WriteMemory(&value, sizeof(value), 0x6a9ec0,0x768,0x5560,-1);
+		}
+	}
+	
+	// TODO: 在此添加控件通知处理程序代码
 }
